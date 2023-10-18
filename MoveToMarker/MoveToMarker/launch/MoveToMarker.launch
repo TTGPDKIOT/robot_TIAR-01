@@ -1,0 +1,11 @@
+<launch>
+    <node pkg="MoveToMarker" type="PoseServer.py" name="pose_server" output="screen" />
+    
+    <node pkg="MoveToMarker" type="PoseClient.py" name="pose_client" output="screen">
+        <launch-prefix>
+            <param name="use_sim_time" value="true" />
+            <param name="respawn" value="true" />
+            <param name="delay" value="3" />
+        </launch-prefix>
+    </node>
+</launch>

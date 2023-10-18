@@ -1,0 +1,4 @@
+# GetArucoPose.srv
+geometry_msgs/PoseStamped GetArucoPose
+---
+geometry_msgs/PoseStamped aruco_pose

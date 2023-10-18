@@ -1,0 +1,4 @@
+# GetMclPose.srv
+geometry_msgs/PoseStamped GetMclPose
+---
+geometry_msgs/PoseStamped mcl_pose
