@@ -12,8 +12,8 @@ class MapToAruco:
         self.tf_buffer = tf2_ros.Buffer(rospy.Duration(2.0))
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer)
         self.client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
-        self.client.wait_for_server()
-
+        self.client.wait_for_server() # test edit online on github
+ 
         self.marker_pose = None
     
     def rotate_robot(self, degrees):
