@@ -1,4 +1,4 @@
-from pymodbus.client.sync import ModbusSerialClient
+from pymodbus.client import ModbusSerialClient
 import time
 
 def decimal_to_hex(input_value):
