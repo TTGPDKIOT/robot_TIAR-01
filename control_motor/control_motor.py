@@ -47,9 +47,9 @@ def cmd_vel_callback(data):
         (sqrt(3)/2 * linear_x + linear_y/2 + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS
     ]
 
-    jog[0] = int(round((wheels[0] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
-    jog[1] = int(round((wheels[1] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
-    jog[2] = int(round((wheels[2] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
+    jog[0] = int(round((wheels[0] * 240 * 20) / (pi * 2), 0))
+    jog[1] = int(round((wheels[1] * 240 * 20) / (pi * 2), 0))
+    jog[2] = int(round((wheels[2] * 240 * 20) / (pi * 2), 0))
 
     # print(jog)
 
@@ -105,9 +105,9 @@ def publish_encoder(client):
     if combined_decimal_3 > 2147483647:
         combined_decimal_3 = combined_decimal_3 - 2**32
     encoder_3_pub.publish(combined_decimal_3)
-    print(combined_decimal_1)
-    print(combined_decimal_2)
-    print(combined_decimal_3)
+    # print(combined_decimal_1)
+    # print(combined_decimal_2)
+    # print(combined_decimal_3)
 
 
 def publish_alarm(client):
