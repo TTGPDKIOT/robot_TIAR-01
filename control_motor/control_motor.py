@@ -126,7 +126,7 @@ def publish_alarm(client):
 def main():
     client = ModbusSerialClient(
         method="rtu",
-        port="/dev/ttyUSB0",
+        port="/dev/ttyS3",
         baudrate=19200,
         stopbits=1,
         parity="N",
@@ -162,7 +162,7 @@ def main():
             client.write_register(0x7C, 0xD8, unit=slave)
         client.close()
 
-if _name_ == '__main__':
+if __name__ == '__main__':
     rospy.init_node('cmd_vel_subscriber_node', anonymous=True)
     rospy.Subscriber("/cmd_vel", Twist, cmd_vel_callback)
     encoder_1_pub = rospy.Publisher("/encoder_1", Int64, queue_size=10)
