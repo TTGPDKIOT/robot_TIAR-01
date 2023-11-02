@@ -42,14 +42,15 @@ def cmd_vel_callback(data):
     angular_z = data.angular.z
 
     wheels = [
-        (-sqrt(3)/2  linear_x + linear_y/2 + CHASSIS_RADIUS  angular_z) / WHEEL_RADIUS,
-        (0  linear_x - linear_y + CHASSIS_RADIUS  angular_z) / WHEEL_RADIUS,
-        (sqrt(3)/2  linear_x + linear_y/2 + CHASSIS_RADIUS  angular_z) / WHEEL_RADIUS
+        (-sqrt(3)/2 * linear_x + linear_y/2 + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS,
+        (0 * linear_x - linear_y + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS,
+        (sqrt(3)/2 * linear_x + linear_y/2 + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS
     ]
 
-    jog[0] = int(round((wheels[0] * 240) / (pi/50), 0))
-    jog[1] = int(round((wheels[1] * 240) / (pi/50), 0))
-    jog[2] = int(round((wheels[2] * 240) / (pi/50), 0))
+    jog[0] = int(round((wheels[0] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
+    jog[1] = int(round((wheels[1] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
+    jog[2] = int(round((wheels[2] * 240 * 20) / (pi * 2 * WHEEL_RADIUS), 0))
+
     # print(jog)
 
 def publish_speed(client):
