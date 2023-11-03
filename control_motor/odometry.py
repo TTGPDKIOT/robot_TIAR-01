@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import rospy
 import tf
-from geometry_msgs.msg import Twist, TransformStamped
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from math import cos, sin, pi
 
@@ -20,9 +20,7 @@ def updateOmniFake(tf_broadcaster):
     odom.header.stamp = time_now
     pub_odom.publish(odom)
 
-    odom_tf = TransformStamped()
-    updateTF(odom_tf)
-    tf_broadcaster.sendTransform(odom_tf)
+    updateTF(tf_broadcaster, time_now)
 
 def updateOdometry(diff_time):
     dt = diff_time.to_sec()
@@ -46,19 +44,24 @@ def updateOdometry(diff_time):
     odom.pose.pose.position.x = odom_pose[0]
     odom.pose.pose.position.y = odom_pose[1]
     odom.pose.pose.position.z = 0.0
-    odom.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, odom_pose[2])
+    quaternion = tf.transformations.quaternion_from_euler(0, 0, odom_pose[2])
+    odom.pose.pose.orientation.x = quaternion[0]
+    odom.pose.pose.orientation.y = quaternion[1]
+    odom.pose.pose.orientation.z = quaternion[2]
+    odom.pose.pose.orientation.w = quaternion[3]
 
     odom.twist.twist.linear.x = odom_vel[0]
     odom.twist.twist.linear.y = odom_vel[1]
     odom.twist.twist.angular.z = odom_vel[2]
 
-def updateTF(odom_tf):
-    odom_tf.header = odom.header
-    odom_tf.child_frame_id = odom.child_frame_id
-    odom_tf.transform.translation.x = odom.pose.pose.position.x
-    odom_tf.transform.translation.y = odom.pose.pose.position.y
-    odom_tf.transform.translation.z = odom.pose.pose.position.z
-    odom_tf.transform.rotation = odom.pose.pose.orientation
+def updateTF(tf_broadcaster, time_now):
+    tf_broadcaster.sendTransform(
+        (odom.pose.pose.position.x, odom.pose.pose.position.y, odom.pose.pose.position.z),
+        (odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w),
+        time_now,
+        odom.child_frame_id,
+        odom.header.frame_id
+    )
 
 def initialize_node():
     rospy.init_node("omni_fake_node")
