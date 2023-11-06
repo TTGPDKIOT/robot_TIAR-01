@@ -1,177 +1,155 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import rospy
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Int64, Int16, Float32
+from std_msgs.msg import Int32MultiArray, Float32MultiArray, Int64MultiArray
 from math import *
 from pymodbus.client.sync import ModbusSerialClient
 
-CHASSIS_RADIUS = 0.26
-WHEEL_RADIUS = 0.1
-jog = [0, 0, 0]
+class MotorController:
+    def __init__(self):
+        self.CHASSIS_RADIUS = 0.26
+        self.WHEEL_RADIUS = 0.1
+        self.jog = [0, 0, 0]
+        self.client = self.initialize_modbus_client()
 
-def decimal_to_hex(input_value):
-    hex_value = hex(input_value & 0xFFFF).upper()
-    return f'0x{hex_value[2:]:0>4}'
+        rospy.init_node('cmd_vel_subscriber_node', anonymous=True)
+        rospy.Subscriber("/cmd_vel", Twist, self.cmd_vel_callback)
+        self.encoder_pub = rospy.Publisher('encoder_pub', Int64MultiArray, queue_size=10)
+        self.speed_pub = rospy.Publisher('speed_pub', Float32MultiArray, queue_size=10)
+        self.alarm_pub = rospy.Publisher('alarm_pub', Int32MultiArray, queue_size=10)
 
-def write_registers(client, slave, direction, velocity):
-    if direction == "clockwise":
-        values = [0x0000, int(velocity, 16)]
-    elif direction == "anticlockwise":
-        values = [0xFFFF, int(velocity, 16)]
-    else:
-        values = [0x0000, 0x0000]
-    client.write_registers(342, values, unit=slave)
+    def initialize_modbus_client(self):
+        return ModbusSerialClient(method="rtu", port="/dev/ttyS3", baudrate=19200, stopbits=1, parity="N", timeout=0.2)
 
-def motor_control(client, slave):
-    input_value = jog[(slave - 1)]
-    # print(f"MOTOR {slave}: ", input_value)
-    hex_value = decimal_to_hex(input_value)
+    def connect_to_modbus(self):
+        if not self.client.connect():
+            rospy.logerr("Failed to connect to Modbus device")
+            return False
+        return True
 
-    if input_value > 0:
-        write_registers(client, slave, "clockwise", hex_value)
-    elif input_value < 0:
-        write_registers(client, slave, "anticlockwise", hex_value)
-    else:
-        write_registers(client, slave, "stop", "0x0000")
+    def setup_motors(self):
+        for unit in [1, 2, 3]:
+            self.client.write_registers(342, [0x0000, 0x0000], unit=unit)
+            self.client.write_register(0x7C, 0x96, unit=unit)
+        rospy.loginfo("Motors ready!")
 
-def cmd_vel_callback(data):
-    global jog
-    linear_x = data.linear.x
-    linear_y = data.linear.y
-    angular_z = data.angular.z
-
-    wheels = [
-        (-sqrt(3)/2 * linear_x + linear_y/2 + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS,
-        (0 * linear_x - linear_y + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS,
-        (sqrt(3)/2 * linear_x + linear_y/2 + CHASSIS_RADIUS * angular_z) / WHEEL_RADIUS
-    ]
-
-    jog[0] = int(round((wheels[0] * 240 * 20) / (pi * 2), 0))
-    jog[1] = int(round((wheels[1] * 240 * 20) / (pi * 2), 0))
-    jog[2] = int(round((wheels[2] * 240 * 20) / (pi * 2), 0))
-
-    # print(jog)
-
-def publish_speed(client):
-    speed_1 = client.read_input_registers(16, 1, unit=1)
-    if speed_1.registers[0] <= 32767:
-        speed_1_data = speed_1.registers[0] * pi / 24000
-    else:
-        speed_1_data = (speed_1.registers[0] - 2**16) * pi / 24000
-    speed_1_pub.publish(speed_1_data)
+    def cmd_vel_callback(self, data):
+        linear_x, linear_y, angular_z = data.linear.x, data.linear.y, data.angular.z
+        wheels = [(-sqrt(3) / 2 * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
+                (0 * linear_x - linear_y + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
+                (sqrt(3) / 2 * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS]
+        self.jog = [int(round((wheels[i] * 240 * 20) / (pi * 2), 0)) for i in range(3)]
 
 
-    speed_2 = client.read_input_registers(16, 1, unit=2)
-    if speed_2.registers[0] <= 32767:
-        speed_2_data = speed_2.registers[0] * pi / 24000
-    else:
-        speed_2_data = (speed_2.registers[0] - 2**16) * pi / 24000
-    speed_2_pub.publish(speed_2_data)
+    def write_velocity(self):
+        hex_values = [f'0x{value & 0xFFFFFFFF:08X}' for value in self.jog]
+        int_values = [int(hex_value, 16) for hex_value in hex_values]
+        for unit, int_value in enumerate(int_values, start=1):
+            self.client.write_registers(342, [int_value >> 16, int_value & 0xFFFF], unit=unit)
+
+    def publish_speed(self):
+        speed_data = Float32MultiArray() 
+        speed_data.data = []  
+
+        for unit in [1, 2, 3]:
+            speed = self.client.read_input_registers(16, 1, unit=unit)
+            if speed.registers[0] <= 32767:
+                speed = round(speed.registers[0] * pi / 24000, 2)
+            else:
+                speed = round((speed.registers[0] - 2 ** 16) * pi / 24000, 2)
+            speed_data.data.append(speed)
+
+        self.speed_pub.publish(speed_data)
+
+    def publish_encoders(self):
+        encoder_data = Int64MultiArray() 
+        encoder_data.data = [] 
+
+        for unit in [1, 2, 3]:
+            encoder = self.client.read_input_registers(10, 2, unit=unit)
+            combined_hex = f"0x{encoder.registers[0]:04X}{encoder.registers[1]:04X}"
+            combined_decimal = int(combined_hex, 16)
+
+            if combined_decimal > (2**16 - 1):
+                combined_decimal -= 2**16
+            encoder_data.data.append(combined_decimal)
+
+        self.encoder_pub.publish(encoder_data)
+
+    def publish_alarm(self):
+        alarm_data = Int32MultiArray() 
+        alarm_data.data = []
+        error_flag = None
+
+        for unit in [1, 2, 3]:
+            alarm = self.client.read_input_registers(0, 2, unit=unit)
+            alarm_data_value = int(f"{alarm.registers[0]:04X}{alarm.registers[1]:04X}", 16)
+
+            if alarm_data_value != 0:
+                alarm_process_value = int(log2(alarm_data_value))
+                rospy.logwarn(f"Driver {unit} encountered an error!")
+                alarm_result = self.process_alarm_result(alarm_process_value)
+                error_flag = True
+            else:
+                alarm_result = alarm_data_value
+
+            alarm_data.data.append(alarm_result)
+
+        self.alarm_pub.publish(alarm_data)
+        if error_flag == True:
+            reset_alarm = input(f"Press 'x' if you have resolved the error on driver:")
+            if reset_alarm == "x":
+                for unit in [1, 2, 3]:
+                    self.client.write_registers(0x7C, 0xBA, unit=unit)
+                print("Error has been resolved. Reset Alarm!")
+                error_flag == False
+            else: 
+                print("Please try again!")
+                print("")
+
+    def process_alarm_result(self, value):
+        if value in range(0, 9):
+            return value
+        if value == 10:
+            return value + 7
+        elif value in range(16, 24):
+            return value + 3
+        elif value == 25:
+            return value + 5
+        elif value in range(25, 27):
+            return value + 8
+        elif value == 28:
+            return value + 9
+        elif value in range(28, 33):
+            return value + 10
+        else:
+            value == 404
+            return value
 
 
-    speed_3 = client.read_input_registers(16, 1, unit=3)
-    if speed_3.registers[0] <= 32767:
-        speed_3_data = speed_3.registers[0] * pi / 24000 
-    else:
-        speed_3_data = (speed_3.registers[0] - 2**16) * pi / 24000
-    speed_3_pub.publish(speed_3_data)
+    def run(self):
+        if not self.connect_to_modbus():
+            return
 
-    
-def publish_encoder(client):
-    encoder_1 = client.read_input_registers(10, 2, unit=1)
-    hex_1_1 = encoder_1.registers[0]
-    hex_1_2 = encoder_1.registers[1]
-    combined_hex_1 = f"0x{hex_1_1:04X}{hex_1_2:04X}"
-    combined_decimal_1 = int(combined_hex_1, 16)
-    if combined_decimal_1 > 2147483647:
-        combined_decimal_1 = combined_decimal_1 - 2**32
-    encoder_1_pub.publish(combined_decimal_1) 
+        try:
+            rospy.loginfo("Connected to Modbus device")
+            self.setup_motors()
+            while not rospy.is_shutdown():
+                self.publish_alarm()
+                self.publish_encoders() 
+                self.write_velocity()
+                self.publish_speed()
 
-    encoder_2 = client.read_input_registers(10, 2, unit=2)
-    hex_2_1 = encoder_2.registers[0]
-    hex_2_2 = encoder_2.registers[1]
-    combined_hex_2 = f"0x{hex_2_1:04X}{hex_2_2:04X}"
-    combined_decimal_2 = int(combined_hex_2, 16)
-    if combined_decimal_2 > 2147483647:
-        combined_decimal_2 = combined_decimal_2 - 2**32
-    encoder_2_pub.publish(combined_decimal_2) 
-    
-    encoder_3 = client.read_input_registers(10, 2, unit=3)
-    hex_3_1 = encoder_3.registers[0]
-    hex_3_2 = encoder_3.registers[1]
-    combined_hex_3 = f"0x{hex_3_1:04X}{hex_3_2:04X}"
-    combined_decimal_3 = int(combined_hex_3, 16)
-    if combined_decimal_3 > 2147483647:
-        combined_decimal_3 = combined_decimal_3 - 2**32
-    encoder_3_pub.publish(combined_decimal_3)
-    # print(combined_decimal_1)
-    # print(combined_decimal_2)
-    # print(combined_decimal_3)
-
-
-def publish_alarm(client):
-    alarm_1 = client.read_input_registers(0, 2, unit=1)
-    alarm_1_data = f"{alarm_1.registers[0]}" + f"{alarm_1.registers[1]}"
-    alarm_1_pub.publish(alarm_1_data)
-
-    alarm_2 = client.read_input_registers(0, 2, unit=2)
-    alarm_2_data = f"{alarm_2.registers[0]}" + f"{alarm_2.registers[1]}"
-    alarm_2_pub.publish(alarm_2_data)
-
-    alarm_3 = client.read_input_registers(0, 2, unit=3)
-    alarm_3_data = f"{alarm_3.registers[0]}" + f"{alarm_3.registers[1]}"
-    alarm_3_pub.publish(alarm_3_data)
-
-def main():
-    client = ModbusSerialClient(
-        method="rtu",
-        port="/dev/ttyS3",
-        baudrate=19200,
-        stopbits=1,
-        parity="N",
-        timeout=0.2,
-    )
-
-    if not client.connect():
-        print("Failed to connect to Modbus device")
-        return
-
-    try:
-        print("Connected to Modbus device")
-        for slave in [1, 2, 3]:
-            client.write_registers(0x7C, [0x0098, 0x0000], unit=slave)
-            client.write_registers(0x7C, [0x00A5, 0x0000], unit=slave)
-            client.write_registers(342, [0x0000, 0x0000], unit=slave)
-            client.write_register(0x7C, 0x96, unit=slave)
-        print("Motors ready!")
-
-        while not rospy.is_shutdown():
-            publish_speed(client)
-            publish_encoder(client)
-            publish_alarm(client)
-            for slave in [1, 2, 3]:
-                motor_control(client, slave)
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    except KeyboardInterrupt:
-        print("KeyboardInterrupt: Turn off the motors!")
-        for slave in [1, 2, 3]:
-            client.write_registers(342, [0x0000, 0x0000], unit=slave)
-            client.write_register(0x7C, 0xD8, unit=slave)
-        client.close()
+        except Exception as e:
+            rospy.logerr(f"An error occurred: {e}")
+        except KeyboardInterrupt:
+            rospy.logwarn("KeyboardInterrupt: Turn off the motors!")
+            for unit in [1, 2, 3]:
+                self.client.write_registers(342, [0x0000, 0x0000], unit=unit)
+                self.client.write_register(0x7C, 0xD8, unit=unit)
+            self.client.close()
 
 if __name__ == '__main__':
-    rospy.init_node('cmd_vel_subscriber_node', anonymous=True)
-    rospy.Subscriber("/cmd_vel", Twist, cmd_vel_callback)
-    encoder_1_pub = rospy.Publisher("/encoder_1", Int64, queue_size=10)
-    encoder_2_pub = rospy.Publisher("/encoder_2", Int64, queue_size=10)
-    encoder_3_pub = rospy.Publisher("/encoder_3", Int64, queue_size=10)
-    alarm_1_pub = rospy.Publisher("/alarm_1", Int16, queue_size=10)
-    alarm_2_pub = rospy.Publisher("/alarm_2", Int16, queue_size=10)
-    alarm_3_pub = rospy.Publisher("/alarm_3", Int16, queue_size=10)
-    speed_1_pub = rospy.Publisher("/speed_1", Float32, queue_size=10)
-    speed_2_pub = rospy.Publisher("/speed_2", Float32, queue_size=10)
-    speed_3_pub = rospy.Publisher("/speed_3", Float32, queue_size=10)
-    main()
+    motor_controller = MotorController()
+    motor_controller.run()
