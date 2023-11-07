@@ -34,13 +34,15 @@ class MotorController:
         for unit in [1, 2, 3]:
             self.client.write_registers(342, [0x0000, 0x0000], unit=unit)
             self.client.write_register(0x7C, 0x96, unit=unit)
+
         rospy.loginfo("Motors ready!")
 
     def cmd_vel_callback(self, data):
         linear_x, linear_y, angular_z = data.linear.x, data.linear.y, data.angular.z
-        wheels = [(-sqrt(3) / 2 * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
+
+        wheels = [((-sqrt(3) / 2) * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
                 (0 * linear_x - linear_y + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
-                (sqrt(3) / 2 * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS]
+                ((sqrt(3) / 2) * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS]
         self.jog = [int(round((wheels[i] * 240 * 20) / (pi * 2), 0)) for i in range(3)]
 
 
@@ -73,10 +75,10 @@ class MotorController:
             combined_hex = f"0x{encoder.registers[0]:04X}{encoder.registers[1]:04X}"
             combined_decimal = int(combined_hex, 16)
 
-            if combined_decimal > (2**16 - 1):
-                combined_decimal -= 2**16
-            encoder_data.data.append(combined_decimal)
+            if combined_decimal > ((2**32)/2 - 1):
+                combined_decimal = combined_decimal - 2**32
 
+            encoder_data.data.append(combined_decimal)
         self.encoder_pub.publish(encoder_data)
 
     def publish_alarm(self):
@@ -104,7 +106,7 @@ class MotorController:
                 alarm = self.client.read_input_registers(0, 2, unit=unit)
                 alarm_data_value = int(f"{alarm.registers[0]:04X}{alarm.registers[1]:04X}", 16)
                 if alarm_data_value == 0:
-                    rospy.loginfo(f"Error on driver {unit} has been resolved!")
+                    rospy.loginfo(f"No error on driver {unit}")
                     error_flag = False
                 else:
                     reset_alarm = input(f"Press 'x' if you have resolved the error on driver {unit}:")
@@ -123,7 +125,7 @@ class MotorController:
         try:
             rospy.loginfo("Connected to Modbus device")
             self.setup_motors()
-            rate = rospy.Rate(10) 
+            rate = rospy.Rate(100) 
 
             while not rospy.is_shutdown():
                 self.publish_alarm()
