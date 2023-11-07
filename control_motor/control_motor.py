@@ -5,8 +5,6 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray, Float32MultiArray, Int64MultiArray
 from math import *
 from pymodbus.client.sync import ModbusSerialClient
-from pymodbus.payload import BinaryPayloadBuilder
-from pymodbus.constants import Endian
 
 class MotorController:
     def __init__(self):
