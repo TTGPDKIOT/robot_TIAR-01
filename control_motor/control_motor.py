@@ -5,6 +5,8 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray, Float32MultiArray, Int64MultiArray
 from math import *
 from pymodbus.client.sync import ModbusSerialClient
+from pymodbus.payload import BinaryPayloadBuilder
+from pymodbus.constants import Endian
 
 class MotorController:
     def __init__(self):
@@ -86,10 +88,9 @@ class MotorController:
             alarm = self.client.read_input_registers(0, 2, unit=unit)
             alarm_data_value = int(f"{alarm.registers[0]:04X}{alarm.registers[1]:04X}", 16)
 
-            if alarm_data_value != 0:
-                alarm_process_value = int(log2(alarm_data_value))
+            if alarm_data_value != 0 and error_flag != True:
+                alarm_result = int(log2(alarm_data_value))
                 rospy.logwarn(f"Driver {unit} encountered an error!")
-                alarm_result = self.process_alarm_result(alarm_process_value)
                 error_flag = True
             else:
                 alarm_result = alarm_data_value
@@ -97,36 +98,23 @@ class MotorController:
             alarm_data.data.append(alarm_result)
 
         self.alarm_pub.publish(alarm_data)
+
         if error_flag == True:
-            reset_alarm = input(f"Press 'x' if you have resolved the error on driver:")
-            if reset_alarm == "x":
-                for unit in [1, 2, 3]:
-                    self.client.write_registers(0x7C, 0xBA, unit=unit)
-                print("Error has been resolved. Reset Alarm!")
-                error_flag == False
-            else: 
-                print("Please try again!")
-                print("")
-
-    def process_alarm_result(self, value):
-        if value in range(0, 9):
-            return value
-        if value == 10:
-            return value + 7
-        elif value in range(16, 24):
-            return value + 3
-        elif value == 25:
-            return value + 5
-        elif value in range(25, 27):
-            return value + 8
-        elif value == 28:
-            return value + 9
-        elif value in range(28, 33):
-            return value + 10
-        else:
-            value == 404
-            return value
-
+            for unit in [1, 2, 3]:
+                alarm = self.client.read_input_registers(0, 2, unit=unit)
+                alarm_data_value = int(f"{alarm.registers[0]:04X}{alarm.registers[1]:04X}", 16)
+                if alarm_data_value == 0:
+                    rospy.loginfo(f"Error on driver {unit} has been resolved!")
+                    error_flag = False
+                else:
+                    reset_alarm = input(f"Press 'x' if you have resolved the error on driver {unit}:")
+                    if reset_alarm == "x":
+                        self.client.write_registers(0x7C, 0xBA, unit=unit) 
+                        print(f"Error on driver {unit} has been resolved. Reset Alarm!")
+                        error_flag = False
+                    else:
+                        print("Wrong input. Please try again!")
+                        print("")  
 
     def run(self):
         if not self.connect_to_modbus():
@@ -135,11 +123,14 @@ class MotorController:
         try:
             rospy.loginfo("Connected to Modbus device")
             self.setup_motors()
+            rate = rospy.Rate(10) 
+
             while not rospy.is_shutdown():
                 self.publish_alarm()
                 self.publish_encoders() 
                 self.write_velocity()
                 self.publish_speed()
+                rate.sleep()
 
         except Exception as e:
             rospy.logerr(f"An error occurred: {e}")
