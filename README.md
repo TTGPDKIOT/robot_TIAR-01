@@ -58,7 +58,7 @@ Local Planner for Navigation.
 https://github.com/rst-tu-dortmund/teb_local_planner.git   
 ```
 
-### Arcuco ROS
+### Aruco ROS
 Detect and measure the distance from the camera to the AR tag.
 #### Download
    ```sh
