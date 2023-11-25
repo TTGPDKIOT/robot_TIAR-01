@@ -4,23 +4,23 @@
 
 - [Tiar-01 Document](#project-name)
   - [Table of Contents](#table-of-contents)
-  - [Essential software stacks and packages.](#about)
+  - [Essential stacks and packages](#essential-stack-and-packages)
     - [ROS Navigation Stack](#ros-navigation-stack)
-    - [Als ROS](#monte-carlo-localization)
-    - [Realsense ROS](#intel-camerta)
-    - [Teb Local Planner](#local-planner)
-    - [Gmapping](#mapping)
-    - [Aruco ROS](#aruco-marker)
+    - [Als ROS](#Als-ROS)
+    - [Realsense ROS](#Realsense-ROS)
+    - [Teb Local Planner](#Teb-local-planner)
+    - [Gmapping](#gmapping)
+    - [Aruco ROS](#aruco-ROS)
     - [Sick Scan](#sick-scan)
-  - [Packages implemented.](#implement-pkgs)
+  - [Packages implemented](#packages-implemented)
     - [Control Motor](#control-motor)
     - [Move To Marker](#move-to-marker)
     - [ROS MQTT](#ros-mqtt)
-    - [Depth Image to Laserscan](#depth-scan)
-    - [Navigation](#navigation-for-tiar-01)
+    - [Depth Image to Laserscan](#depth-image-to-laserscan)
+    - [Navigation](#navigation)
   - [Usage](#usage)
 
-## Essential software stacks and packages
+## Essential stacks and packages
 
 ### ROS Navigation Stack
 The main stack responsible for the automotive movement of the robot.
