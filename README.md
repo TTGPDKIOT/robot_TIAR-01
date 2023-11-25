@@ -33,7 +33,7 @@ The main stack responsible for the automotive movement of the robot.
    https://github.com/ros-planning/navigation_msgs.git
    ```
 
-### ALS ROS
+### Als ROS
 Localization system for a robot with a 2D lidar.
 #### Download
    ```sh
