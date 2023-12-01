@@ -5,6 +5,8 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray, Float32MultiArray, Int64MultiArray
 from math import *
 from pymodbus.client.sync import ModbusSerialClient
+import concurrent.futures
+
 
 class MotorController:
     def __init__(self):
@@ -30,12 +32,16 @@ class MotorController:
 
     def setup_motors(self):
         for unit in [1, 2, 3]:
-            self.client.write_registers(342, [0x0000, 0x0000], unit=unit)
-            self.client.write_register(0x7C, 0x96, unit=unit)
+            self.client.write_register(0x7C, 0xD8, unit=unit)                       # stop jogging
+            self.client.write_registers(0x7C, [0x0098, 0x0000, 0x0000], unit=unit)  # reset encoder
+            self.client.write_register(0x7C, 0x9F, unit=unit)                       # motor enable     
+            self.client.write_registers(342, [0x0000, 0x0000], unit=unit)           # set speed is zero
+            self.client.write_register(0x7C, 0x96, unit=unit)                       # start jogging
 
         rospy.loginfo("Motors ready!")
 
-    def cmd_vel_callback(self, data):
+    # subscribe topic cmd_vel
+    def cmd_vel_callback(self, data):                       
         linear_x, linear_y, angular_z = data.linear.x, data.linear.y, data.angular.z
 
         wheels = [((-sqrt(3) / 2) * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS,
@@ -43,12 +49,24 @@ class MotorController:
                 ((sqrt(3) / 2) * linear_x + linear_y / 2 + self.CHASSIS_RADIUS * angular_z) / self.WHEEL_RADIUS]
         self.jog = [int(round((wheels[i] * 240 * 20) / (pi * 2), 0)) for i in range(3)]
 
+    def write_velocity_for_unit(self, unit, int_value):
+            self.client.write_registers(342, [int_value >> 16, int_value & 0xFFFF], unit=unit)
 
     def write_velocity(self):
-        hex_values = [f'0x{value & 0xFFFFFFFF:08X}' for value in self.jog]
-        int_values = [int(hex_value, 16) for hex_value in hex_values]
-        for unit, int_value in enumerate(int_values, start=1):
-            self.client.write_registers(342, [int_value >> 16, int_value & 0xFFFF], unit=unit)
+            hex_values = [f'0x{value & 0xFFFFFFFF:08X}' for value in self.jog]
+            int_values = [int(hex_value, 16) for hex_value in hex_values]
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                futures = [executor.submit(self.write_velocity_for_unit, unit, int_value) for unit, int_value in enumerate(int_values, start=1)]
+                concurrent.futures.wait(futures)
+
+
+
+    # def write_velocity(self):
+    #     hex_values = [f'0x{value & 0xFFFFFFFF:08X}' for value in self.jog]
+    #     int_values = [int(hex_value, 16) for hex_value in hex_values]
+    #     for unit, int_value in enumerate(int_values, start=1):
+    #         self.client.write_registers(342, [int_value >> 16, int_value & 0xFFFF], unit=unit)
 
     def publish_speed(self):
         speed_data = Float32MultiArray() 
@@ -138,7 +156,7 @@ class MotorController:
             rospy.logwarn("KeyboardInterrupt: Turn off the motors!")
             for unit in [1, 2, 3]:
                 self.client.write_registers(342, [0x0000, 0x0000], unit=unit)
-                self.client.write_register(0x7C, 0xD8, unit=unit)
+                self.client.write_register(0x7C, 0xD8, unit=unit)                   # stop jogging 
             self.client.close()
 
 if __name__ == '__main__':
