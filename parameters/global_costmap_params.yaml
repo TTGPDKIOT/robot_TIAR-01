@@ -1,0 +1,26 @@
+# global_costmap:
+#   global_frame: map
+#   rolling_window: true # true required for rrt_exploration
+#   width: 100.0
+#   height: 100.0
+#   resolution: 0.05
+#   track_unknown_space: true
+#   inflation_layer:
+#     inflation_radius: 1.0
+#   plugins:
+#     - {name: static_layer, type: "costmap_2d::StaticLayer"}
+#     - {name: obstacle_layer, type: "costmap_2d::VoxelLayer"}
+#     - {name: inflation_layer, type: "costmap_2d::InflationLayer"}
+
+global_costmap:
+  global_frame: map                 # đặt khung bản đồ
+  robot_base_frame: base_footprint  # đặt khung cơ sở của rô bốt
+
+  update_frequency: 50.0            # tần số cập nhật # last equatl 10
+  publish_frequency: 50.0           # tần suất xuất bản # last equatl 10
+  transform_tolerance: 0.2       # thời gian dung sai biến đổi # last equatl 0.2
+
+  static_map: true                  # thiết lập có sử dụng bản đồ đã cho hay không
+  width: 100.0
+  height: 100.0
+  resolution: 0.05

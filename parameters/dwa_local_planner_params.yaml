@@ -1,0 +1,47 @@
+DWAPlannerROS:
+
+# thông số rô bốt
+  max_vel_x: 0.26         # vận tốc tối đa cho trục x (mét / giây)
+  min_vel_x: -0.26        # vận tốc min đối với trục x (mét / giây)
+
+  max_vel_y: 0.26          # Không được sử dụng. chỉ áp dụng cho rô bốt đa hướng
+  min_vel_y: -0.26         # Không được sử dụng. chỉ áp dụng cho rô bốt đa hướng
+  
+# The velocity when robot is moving in a straight line
+  max_vel_trans:  0.26    # vận tốc tịnh tiến tối đa (mét / giây)
+  min_vel_trans:  0.13    # vận tốc tịnh tiến tối thieu (mét / giây)
+
+  max_vel_theta: 0.5    # vận tốc quay tối đa (radian / giây)
+  min_vel_theta: 0.3    # vận tốc quay tối thieu (radian / giây)
+
+  acc_lim_x: 2.5          # giới hạn cho gia tốc trục x (mét / giây ^ 2)
+  acc_lim_y: 2.5          # giới hạn cho gia tốc trục y (mét / giây ^ 2)
+  acc_lim_theta: 3.2      # giới hạn gia tốc góc trục theta (radian / giây ^ 2)
+
+# Dung sai điểm mục tiêu
+  xy_goal_tolerance: 0.1           # x, y khoảng cách Sai số điểm mục tiêu (mét)
+  yaw_goal_tolerance: 0.2          # dung sai điểm mục tiêu trục yaw (radian)
+  latch_xy_goal_tolerance: false
+
+# Thông số mô phỏng chuyển tiếp
+  sim_time: 4.0           # thời gian quỹ đạo mô phỏng chuyển tiếp
+  vx_samples: 20          # thời gian quỹ đạo mô phỏng chuyển tiếp
+  vy_samples: 20           # số lượng mẫu trong không gian vận tốc trục y
+  vth_samples: 40         # số lượng mẫu trong không gian vận tốc trục theta
+  controller_frequency: 10.0
+
+# Tham số cho điểm quỹ đạo (đánh giá quỹ đạo)
+  path_distance_bias: 32.0
+  goal_distance_bias: 20.0
+  occdist_scale: 0.02
+  forward_point_distance: 0.325
+  stop_time_buffer: 0.2
+  scaling_speed: 0.25
+  max_scaling_factor: 0.2
+
+# Oscillation Prevention Parameters
+  oscillation_reset_dist: 0.05        # khoảng cách robot phải di chuyển trước khi cờ dao động được đặt lại
+
+# Debugging
+  publish_traj_pc : true        # cài đặt gỡ lỗi cho quỹ đạo chuyển động
+  publish_cost_grid_pc: true    # cài đặt gỡ lỗi cho bản đồ chi phí

@@ -1,0 +1,42 @@
+footprint: [[0.3464, 0.20], [0.3464, -0.20], [0, -0.40], [-0.3464, -0.20], [-0.3464, 0.20], [0, 0.40]]
+# footprint: [[0.05, 0.05], [0.05, -0.05], [-0.05, -0.05], [-0.05, 0.05]]
+
+robot_base_frame: base_footprint
+update_frequency: 50.0 # last equatl 10
+publish_frequency: 3.0 # last equal 3
+transform_tolerance: 0.3
+
+obstacle_range: 5.5
+raytrace_range: 6.0
+
+# inflation_radius: 1
+# cost_scaling_factor: 1
+
+inflation_radius: 0.4
+cost_scaling_factor: 1.0
+
+#layer definitions
+static_layer:
+    map_topic: map
+    subscribe_to_updates: true
+
+# observation_sources: scan point
+
+# laser_scan_sensor: {sensor_frame: base_laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+# cam_scan_sensor: {sensor_frame: camera_link, data_type: LaserScan, topic: /camscan, marking: true, clearing: true}
+
+
+# point_cloud_sensor: {sensor_frame: camera_link, data_type: PointCloud2, topic: /camera/depth/color/points, marking: true, clearing: true}
+
+observation_sources: scan camscan pointcloud
+scan: {sensor_frame: base_laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+camscan: {sensor_frame: camera_link, data_type: LaserScan, topic: /camscan, marking: true, clearing: true}
+pointcloud: {sensor_frame: camera_link, data_type: PointCloud2, topic: /camera/depth/color/points, marking: true, clearing: true}
+
+obstacle_layer:
+    observation_sources: scan camscan
+    scan: {sensor_frame: base_laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+    camscan: {sensor_frame: camera_link, data_type: LaserScan, topic: /camscan, marking: true, clearing: true}
+
+    # observation_sources: PointCloud2
+    # scan: {sensor_frame: camera_link, data_type: PointCloud2, topic: /scan, marking: true, clearing: true}

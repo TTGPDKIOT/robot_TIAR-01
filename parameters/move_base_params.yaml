@@ -1,0 +1,16 @@
+# chọn có dừng nút bản đồ chi phí khi move_base không hoạt động hay không.
+shutdown_costmaps: false
+# chu kỳ lặp lại điều khiển (tính bằng Hz) đặt lệnh tốc độ đến cơ sở rô bốt.
+controller_frequency: 20.0 # last equal 10
+# thời gian tối đa (tính bằng giây) mà bộ điều khiển sẽ lắng nghe thông tin điều khiển trước hoạt động xóa không gian được thực hiện.
+controller_patience: 15.0 # last equal 15
+# chu kỳ lặp lại của gói global_plan (tính bằng Hz).
+planner_frequency: 20.0 # last equal 10
+# khoảng thời gian tối đa (tính bằng giây) để chờ một gói khả dụng trước khi giải phóng dung lượng hoạt động được thực hiện.
+planner_patience: 5.0 # last equal 5
+# thời gian (tính bằng giây) được phép để cho phép rô-bốt di chuyển qua lại trước khi thực hiện khôi phục hành vi.
+oscillation_timeout: 10.0 # last equal 10
+# dao động_thời gian chờ được khởi tạo nếu bạn di chuyển khoảng cách dưới khoảng cách (tính bằng mét) mà robot nên di chuyển để nó không di chuyển qua lại.
+oscillation_distance: 0.2 # last equal 0.2
+# Các chướng ngại vật xa hơn khoảng cách cố định sẽ bị xóa trên bản đồ trong quá trình khởi tạo bản đồ chi phí của hoạt động khôi phục.
+conservative_reset_dist: 3.0 # last equal 3
