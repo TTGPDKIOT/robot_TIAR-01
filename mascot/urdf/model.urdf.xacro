@@ -1,0 +1,153 @@
+<?xml version="1.0"?>
+<robot name="model" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:include filename="$(find mascot)/urdf/model.gazebo.xacro" />
+    
+    <material name="blue">
+        <color rgba="0.0 0.0 0.8 1.0"/>
+    </material>
+    <material name="grey">
+        <color rgba="0.5 0.5 0.5 1.0"/>
+    </material>
+    <material name="orange">
+        <color rgba="${255/255} ${108/255} ${10/255} 1.0"/>
+    </material>
+    <material name="brown">
+        <color rgba="${222/255} ${207/255} ${195/255} 1.0"/>
+    </material>
+
+    <link name="base_footprint"></link>
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link" />
+    </joint>
+
+    <link name='base_link'>
+        <xacro:cyl_inertia mass="${base_mass}" r="${base_radius}" h="${base_height}"/>
+        
+        <collision >
+            <geometry>
+                    <cylinder radius="${base_radius}" length="${base_height}"/>
+            </geometry>
+        </collision>
+
+        <visual>
+            <geometry>
+                <cylinder radius="${base_radius}" length="${base_height}"/>
+            </geometry>
+            <material name="orange"/>
+        </visual>
+    </link>
+  
+    <gazebo reference="base_link">
+        <material>Gazebo/Orange</material>
+    </gazebo>
+  
+    <xacro:macro name = "caster" params = "prefix pos_x">
+        <joint name="${prefix}_caster_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${prefix}_caster_link"/>
+            <origin xyz="${(base_radius - caster_radius*1.5)*pos_x} 0 -${wheel_radius - caster_radius}" rpy="0.0 0.0 0.0"/>
+        </joint>
+
+        <link name="${prefix}_caster_link">
+            <xacro:sphere_inertia mass="${caster_mass}" r="${caster_radius}"/>
+
+            <collision >
+                <geometry>
+                    <sphere radius="${caster_radius}"/>
+                </geometry>
+            </collision>
+
+            <visual>
+                <geometry>
+                        <sphere radius="${caster_radius}"/>
+                </geometry>
+                <material name="brown"/>
+            </visual>
+        </link>
+
+        <gazebo reference="${prefix}_caster_link">
+            <mu1>0.0</mu1>
+            <mu2>0.0</mu2>
+            <material>Gazebo/Brown</material>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:caster prefix = "front" pos_x = "1" />
+    <xacro:caster prefix = "back" pos_x = "-1" />
+
+    <xacro:macro name = "wheel" params = "prefix pos_y">
+        <joint type="continuous" name="${prefix}_wheel_joint">
+            <origin xyz="0 ${base_radius*pos_y} 0" rpy="0 0 0"/>
+            <child link="${prefix}_wheel_link"/>
+            <parent link="base_link"/>
+            <axis xyz="0 1 0" rpy="0 0 0"/>
+            <limit effort="10000" velocity="1000"/>
+            <dynamics damping="1.0" friction="1.0"/>
+        </joint>
+
+        <link name="${prefix}_wheel_link">
+            <xacro:cyl_inertia mass="${wheel_mass}" r="${wheel_radius}" h="${wheel_height}"/>
+
+            <visual>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0.0 0"/>
+                <geometry>
+                    <cylinder radius="${wheel_radius}" length="${wheel_height}"/>
+                </geometry>
+                <material name="grey"/>
+            </visual>
+
+            <collision>
+                <origin xyz="0.0 0.0 0.0" rpy="${pi/2} 0.0 0"/>
+                <geometry>
+                        <cylinder radius="${wheel_radius}" length="${wheel_height}"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <gazebo reference="${prefix}_wheel_link">
+            <material>Gazebo/Grey</material>
+        </gazebo>
+    </xacro:macro>
+
+    <xacro:wheel prefix = "left" pos_y="1"/>
+    <xacro:wheel prefix = "right" pos_y="-1"/>
+
+    <joint name="laser_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="laser_link"/>
+        <origin xyz="${base_radius/2} 0.0 ${base_height/2 + laser_height/2}" rpy="0.0 0.0 0.0"/>
+    </joint>
+    
+    <link name="laser_link">
+        <xacro:box_inertia mass = "${laser_mass}" x = "${laser_length}" y = "${laser_width}" z = "${laser_height}"/>
+
+        <visual>
+            <geometry>
+                <mesh filename="package://mascot/meshes/lds.stl" scale="0.002 0.002 0.002"/>
+            </geometry>
+            <material name="grey"/>
+        </visual>
+
+        <collision >
+            <geometry>
+                <mesh filename="package://mascot/meshes/lds.stl" scale="0.002 0.002 0.002"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <gazebo reference="laser_link">
+        <material>Gazebo/Grey</material>
+    </gazebo>
+
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <link name="imu_link"/>
+    
+  
+</robot>
