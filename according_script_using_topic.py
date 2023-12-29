@@ -1,35 +1,48 @@
 #!/usr/bin/env python3
 
 import rospy
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import actionlib
-from actionlib_msgs.msg import *
 from geometry_msgs.msg import Pose, Point, Quaternion
 from std_msgs.msg import String
-from action_example.msg import CountingAction, CountingGoal
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from geometry_msgs.msg import PoseWithCovarianceStamped
+import tf.transformations as tf_trans
+
+from math import *
 
 import sys
 sys.path.append('/home/sangpham/catkin_ws/src/ros_mqtt/src')  # Path to the directory containing define_mqtt.py
-
 from define_mqtt import DefineMqtt
 
-receive_data = None
-data_flag = False
-position_flag = None
 
-positions = [
+# Dữ liệu AI gửi đến
+AI_data = None
+distance_AI = None
+angle_AI = None
+
+interrupt_flag = False  # Cờ ngắt Topic subscriber AI
+position_flag = None    # Cờ ngắt mảng landmarks
+
+# Khai báo mảng các điểm mốc
+landmarks = [
     {'x':  0.56, 'y': -0.78, 'quat': {'r1': 0.000, 'r2': 0.000, 'r3': 0.707, 'r4': 0.707}},
     {'x':  0.04, 'y':  2.70, 'quat': {'r1': 0.000, 'r2': 0.000, 'r3': 1.000, 'r4': -1.000}},
     {'x': -3.30, 'y': 1.220, 'quat': {'r1': 0.000, 'r2': 0.000, 'r3': 1, 'r4': 1}},
 ]
 
-person = {'x':  -6, 'y': -1, 'quat': {'r1': 0.000, 'r2': 0.000, 'r3': 1, 'r4': -1}}
+# Hàm subscribe dữ liệu AI gửi đến
+def callback(data):
+    global interrupt_flag, AI_data, distance_AI, angle_AI
+    if not interrupt_flag:
+        AI_data = data.data
+        AI_data_dict = eval(AI_data)
 
-# def callback(data):
-#     global receive_data, data_flag
-#     receive_data = data.data
-#     data_flag = True
+        distance_AI = AI_data_dict['distance']
+        angle_AI = AI_data_dict['angle']
 
+        interrupt_flag = True
+
+# Hàm sắp xếp lại mảng các cột mốc
 def shift_array_elements(arr, first_element):
     if first_element in arr:
         index = arr.index(first_element)
@@ -38,14 +51,13 @@ def shift_array_elements(arr, first_element):
         shifted_array = arr[index:] + arr[:index]
 
         # Gán giá trị của shifted_array vào mảng ban đầu
-        arr[:] = shifted_array
+        arr[:] = shifted_array  # arr[:] có thể được hiểu là một con trỏ
     else:
         print("The first element does not exist in the array.")
 
+
 class GoToPose():
     def __init__(self):
-        self.run_request = None
-
         self.move_base = actionlib.SimpleActionClient("move_base", MoveBaseAction)
         self.move_base.wait_for_server()
 
@@ -57,29 +69,54 @@ class GoToPose():
         self.define.mqtt_client.on_message = self.on_mqtt_message
         self.define.mqtt_client.subscribe(self.mqtt_sub_signal)
         self.define.mqtt_client.loop_start()
+        self.run_request = None # Các yêu cầu bắt đầu/ kết thúc tương tác được nhận từ MQTT
 
+        self.amcl_yaw_euler = None
+        self.amcl_position_x = None
+        self.amcl_position_y =None
+
+        self.amcl_flag = False  # Cờ ngắt topic /amcl_pose
+
+
+    # Decode giá trị MQTT
     def on_mqtt_message(self, client, userdata, msg):
         self.run_request = msg.payload.decode()
-    
+
+    # Subscribe /amcl_pose
+    def amcl_callback(self, msg):
+        if self.amcl_flag:
+            amcl_data = msg
+            # Biến đổi từ quaternion sang euler
+            amcl_angle_euler = tf_trans.euler_from_quaternion([amcl_data.pose.pose.orientation.x, amcl_data.pose.pose.orientation.y,
+                                                                    amcl_data.pose.pose.orientation.z, amcl_data.pose.pose.orientation.w])
+            
+            self.amcl_yaw_euler = amcl_angle_euler[2]
+            self.amcl_position_x = amcl_data.pose.pose.position.x
+            self.amcl_position_y = amcl_data.pose.pose.position.y
+
+            self.amcl_flag = False
+            return
+        
+    # Chờ đợi yêu cầu khi robot đến vị trí người dùng
     def duration(self):
-        for i in range(15):
-            print(i)
+        for i in range(15): # Chờ 15 giây sau khi đến vị trí người dùng
+            print("I'm waiting")
             if self.run_request is not None and self.run_request.lower() == "interact":
-                print("continuring duration")
+                print("User is interacting")
                 while True:
                     if self.run_request is not None and self.run_request.lower() == "end":
                         self.run_request = None
                         rospy.sleep(1)
-                        print("end")
+                        print("End intract")
                         break
                 break
             rospy.sleep(1)
         else:
-            print("continue move according script")
+            print("Not have interact, keep moving")
             main()
-        print("hihi")
         main()
-    
+
+    # Tạo điểm goal
     def create_goal(self, pos, quat):
         goal = MoveBaseGoal()
         goal.target_pose.header.frame_id = 'map'
@@ -87,99 +124,95 @@ class GoToPose():
         goal.target_pose.pose = Pose(Point(pos['x'], pos['y'], 0.0),
                                      Quaternion(quat['r1'], quat['r2'], quat['r3'], quat['r4']))
         return goal
-
+    
+    # Thực hiện hành động di chuyển
     def send_goal(self, goal):
-        # self.sub = rospy.Subscriber('ex_pub', String, callback)
- 
-
+        global interrupt_flag
+        if not interrupt_flag:
+            self.sub = rospy.Subscriber('ex_pub', String, callback)
         self.move_base.send_goal(goal)
 
+    # Chờ đợi kết quả di chuyển
     def wait_for_result(self):
-        while not rospy.is_shutdown() and not data_flag:
+        while not rospy.is_shutdown() and not interrupt_flag:
             if self.move_base.get_state() == actionlib.GoalStatus.ACTIVE:
                 if self.move_base.wait_for_result(rospy.Duration(1.0)):
                     break
 
+    # Hàm thực hiện di chuyển robot đến vị trí người dùng khi phát hiện yêu cầu tương tác
     def cancel_goal(self):
         if self.move_base.get_state() == actionlib.GoalStatus.ACTIVE:
             self.move_base.cancel_goal()
-            rospy.sleep(2)
-            goal = self.create_goal(person, person['quat'])
-            self.send_goal(goal)
-            result = self.move_base.wait_for_result()
-            if result:
-                global data_flag, positions
-                print("success")
-                shift_array_elements(positions, position_flag)
-                data_flag = False
-                self.duration()
+            rospy.sleep(1)
+            self.amcl_flag = True
 
+            rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.amcl_callback)
+            rospy.sleep(0.1)    # cần có để đảm bảo nhận được dữ liệu từ topic /amcl_pose
+            if self.amcl_yaw_euler is not None:
+                # Đảm bảo tất cả giá trị góc có đơn vị là radian
+                goal_angle = self.amcl_yaw_euler + radians(angle_AI)
+
+                quat_angle_AI = tf_trans.quaternion_from_euler(0, 0, goal_angle)
+                # Công thức tính vị trị của người yêu cầu tương tác
+                new_position_x = self.amcl_position_x + distance_AI * cos(goal_angle)
+                new_position_y = self.amcl_position_y + distance_AI * sin(goal_angle)
+                
+                person_pose = {'x':  new_position_x, 
+                          'y': new_position_y, 
+                          'quat': {'r1': quat_angle_AI[0], 'r2': quat_angle_AI[1], 
+                                   'r3': quat_angle_AI[2], 'r4': quat_angle_AI[3]}}
+
+                print(f"Detect prey at coordinate: ({new_position_x, new_position_y})")
+                print("Gooooooooo!!!!!!")
+
+                goal = self.create_goal(person_pose, person_pose['quat'])
+                self.send_goal(goal)
+                result = self.move_base.wait_for_result()
+                if result:
+                    global interrupt_flag, landmarks
+                    print("It's delicious")
+                    shift_array_elements(landmarks, position_flag)
+                    # interrupt_flag = False
+                    self.duration()
+
+    # Hàm trả về kết quả action move_base
     def get_result(self):
         return self.move_base.get_result()
-
+    
+    # Hhực hiện kịch bản chương trình
     def navigate_to(self, pos, quat):
         goal = self.create_goal(pos, quat)
         self.send_goal(goal)
         self.wait_for_result()
-        # if data_flag:
+        # if interrupt_flag:
         self.cancel_goal()
         return self.get_result()
 
-
-class CountingClient:
-    def __init__(self):
-        self.client = actionlib.SimpleActionClient('move_forward', CountingAction)
-
-    def move_forward(self, duration):
-        if not self.client.wait_for_server(timeout=rospy.Duration(1.0)):
-            rospy.logwarn("The move_forward action server is not available. Skipping move_forward action.")
-            return
-
-        goal = CountingGoal()
-        goal.duration = duration
-
-        self.client.send_goal(goal)
-
-        rospy.loginfo("Waiting for the robot to move forward...")
-        self.client.wait_for_result(timeout=rospy.Duration(1.0))
-
-        if self.client.get_state() == actionlib.GoalStatus.SUCCEEDED:
-            result = self.client.get_result()
-            rospy.loginfo("Result: {}".format(result.result))
-        else:
-            rospy.logwarn("Move forward action did not succeed within the specified timeout.")
-
-
 def main():
-    global position_flag
+    global position_flag, interrupt_flag
     navigator = GoToPose()
-    counting_client = CountingClient()
-
-    while not data_flag:
-        counting_client.move_forward(duration='Like')
-
-        for position in positions:
-            rospy.loginfo("Going to (%s, %s) pose", position['x'], position['y'])
+    interrupt_flag = False
+    while not interrupt_flag:
+        for i, position in enumerate(landmarks, start=1):
+            rospy.loginfo(f"Going to landmark: {i}")
             position_flag = position
             success = navigator.navigate_to(position, position['quat'])
 
-            if data_flag:
+            if interrupt_flag:
                 rospy.loginfo("Received cancel signal. Stopping the robot.")
                 break 
 
             if success:
-                rospy.loginfo("Reached the desired pose (%s, %s)", position['x'], position['y'])
+                rospy.loginfo(f"Reached the landmark {i}")
             else:
-                rospy.loginfo("Failed to reach the desired pose (%s, %s)", position['x'], position['y'])
+                rospy.loginfo(f"Reached the landmark {i}")
                 break
-
 
 if __name__ == '__main__':
     rospy.init_node('nav_test', anonymous=False)
-
     try:
         while not rospy.is_shutdown():
+
             main()
-        
     except rospy.ROSInterruptException:
         rospy.loginfo("ROSInterruptException. Quitting")
